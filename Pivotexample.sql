@@ -8,25 +8,37 @@
 declare @tablename nvarchar(4000) = ''
 declare @columnname nvarchar(4000) = ''
 
+declare @sql as nvarchar(4000) = ''
 
 --why?
-drop table ##tempDistinctInColumn
---Declare @CSL nvarchar  (4000)= ''  --Dropped the idea of keeping it as 
-
+--drop table #tempDistinctInColumn
+--Declare @CSL nvarchar  (4000)= ''  --Using a global temp table instead of a variable
+IF OBJECT_ID('tempdb..#tempDistinctInColumn') is not null
+drop table #tempDistinctInColumn
+IF OBJECT_ID('tempdb..##CSL') is not null
+drop table ##CSL
+create table ##CSL (CSL nvarchar(4000))
+insert into ##CSL values ('')
 --something to iterate over all the elements
+set @sql ='
 select row_number() over (order by CUST)  as id, CUST 
-into ##tempDistinctInColumn
+into #tempDistinctInColumn
 from ( select distinct CUST as CUST from ##PRODUCT) P
 
 --the fist element
-set @CSL = @CSL + (select CUST from ##tempDistinctInColumn where id = (select max(id) from #temp) )
-delete from  ##tempDistinctInColumn where id = (select max(id) from ##tempDistinctInColumn)
+update ##CSL
+set CSL = CSL + (select CUST from #tempDistinctInColumn where id = (select max(id) from #tempDistinctInColumn) )
+delete from  #tempDistinctInColumn where id = (select max(id) from #tempDistinctInColumn)
 
 --the rest of them
-while ((select count(*) from ##tempDistinctInColumn) > 0)
+while ((select count(*) from #tempDistinctInColumn) > 0)
 begin
-		set @CSL = @CSL +  ', ' +(select CUST from ##tempDistinctInColumn where id = (select max(id) from ##tempDistinctInColumn) )
-		delete from  ##tempDistinctInColumn where id = (select max(id) from ##tempDistinctInColumn)
-end
+		update ##CSL
+		set CSL = CSL +  '', '' +(select CUST from #tempDistinctInColumn where id = (select max(id) from #tempDistinctInColumn) )
+		delete from  #tempDistinctInColumn where id = (select max(id) from #tempDistinctInColumn)
+end'
 
-print @csl
+print (@sql)
+exec(@sql)
+
+select CSL from ##CSL
